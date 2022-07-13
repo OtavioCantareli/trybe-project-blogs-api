@@ -19,13 +19,19 @@ const validateToken = (req, res, next) => {
     });
   }
 
-  if (!jwt.verify(token, secret)) {
-    return res.status(401).json({
-      message: 'Expired or invalid token',
-    });
-  }
+  try {
+    const decoded = jwt.verify(token, secret);
 
-  return next();
+    if (!decoded) {
+      return res.status(401).json({
+        message: 'Expired or invalid token',
+      });
+    }
+
+    return next();
+  } catch (err) {
+    return res.status(401).json({ message: 'Expired or invalid token' });
+  }
 };
 
 const validateLogin = async (req, res, next) => {
@@ -58,7 +64,7 @@ router.post('/login', validateLogin, async (req, res) => {
 
     return res.status(200).json({ token });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 });
 
@@ -106,7 +112,17 @@ router.post('/user', validatePost, async (req, res) => {
 
     return res.status(201).json({ token });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+router.get('/user', validateToken, async (req, res) => {
+  try {
+    const users = await User.findAll({ attributes: { exclude: 'password' } });
+
+    return res.status(200).json(users);
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
   }
 });
 
