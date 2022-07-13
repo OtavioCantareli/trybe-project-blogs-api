@@ -1,10 +1,13 @@
 const express = require('express');
+const router = require('./controller/MasterController');
 
 // ...
 
 const app = express();
 
 app.use(express.json());
+
+app.use(router);
 
 // ...
 
