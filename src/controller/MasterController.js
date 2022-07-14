@@ -4,7 +4,7 @@ const express = require('express');
 
 const jwt = require('jsonwebtoken');
 
-const { User } = require('../database/models');
+const { User, Category } = require('../database/models');
 
 const router = express.Router();
 
@@ -142,6 +142,24 @@ router.get('/user/:id', validateToken, async (req, res) => {
     }
 
     return res.status(200).json(user);
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+router.post('/categories', validateToken, async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        message: '"name" is required',
+      });
+    }
+
+    const category = await Category.create({ name });
+
+    return res.status(201).json(category);
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
