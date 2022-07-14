@@ -4,13 +4,19 @@ const express = require('express');
 
 const jwt = require('jsonwebtoken');
 
-const { User, Category } = require('../database/models');
+const {
+  User,
+  Category,
+  BlogPost,
+  PostCategory,
+} = require('../database/models');
+// const PostCategory = require('../database/models/postCategory');
 
 const router = express.Router();
 
 const secret = process.env.JWT_SECRET;
 
-const validateToken = (req, res, next) => {
+const validateToken = async (req, res, next) => {
   const token = req.headers.authorization;
 
   if (!token) {
@@ -22,14 +28,15 @@ const validateToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, secret);
 
-    if (!decoded) {
-      return res.status(401).json({
-        message: 'Expired or invalid token',
-      });
-    }
+    const user = await User.findOne({
+      where: { displayName: decoded.data.displayName },
+    });
+
+    req.user = user;
 
     return next();
   } catch (err) {
+    console.log(err);
     return res.status(401).json({ message: 'Expired or invalid token' });
   }
 };
@@ -68,7 +75,7 @@ router.post('/login', validateLogin, async (req, res) => {
   }
 });
 
-const validatePost = async (req, res, next) => {
+const validateUserCreation = async (req, res, next) => {
   const regex = /^\w+@[a-zA-Z_]+?\.[a-zA-Z]{2,3}$/;
 
   const { displayName, email, password } = req.body;
@@ -94,7 +101,7 @@ const validatePost = async (req, res, next) => {
   return next();
 };
 
-router.post('/user', validatePost, async (req, res) => {
+router.post('/user', validateUserCreation, async (req, res) => {
   try {
     const { displayName, email, password, image } = req.body;
 
@@ -170,6 +177,57 @@ router.get('/categories', validateToken, async (req, res) => {
     const categories = await Category.findAll();
 
     return res.status(200).json(categories);
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+const validatePost = async (req, res, next) => {
+  const { title, content, categoryIds } = req.body;
+
+  if (!title || !content) {
+    return res.status(400).json({
+      message: 'Some required fields are missing',
+    });
+  }
+  const categories = await Category.findAll({
+    where: { id: categoryIds },
+  });
+
+  if (categories.length < 1) {
+    return res.status(400).json({
+      message: '"categoryIds" not found',
+    });
+  }
+
+  return next();
+};
+
+const insertIds = async ({ categoryIds, post }) => {
+  categoryIds.forEach((id) => {
+    PostCategory.create({
+      postId: post.dataValues.id,
+      categoryId: id,
+    });
+  });
+};
+
+router.post('/post', validateToken, validatePost, async (req, res) => {
+  try {
+    const { title, content, categoryIds } = req.body;
+
+    const post = await BlogPost.create({
+      title,
+      content,
+      categoryIds,
+      userId: req.user.dataValues.id,
+      updated: Date.now(),
+      published: Date.now(),
+    });
+
+    insertIds({ categoryIds, post });
+
+    return res.status(201).json(post);
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
